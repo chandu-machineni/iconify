@@ -75,70 +75,63 @@ const Index = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-    <div className="min-h-screen flex flex-col bg-background">
-  {/* Removed the Header component */}
-  
- <div className="min-h-screen flex flex-col bg-background">
-  <main className="flex-1 w-full px-4 py-6">
-    <div className="container mx-auto max-w-7xl">
-      {/* Search bar */}
-      <div className="mb-8 max-w-3xl mx-auto">
-        <h1 className="text-3xl font-semibold mb-3 text-center font-display pt-0">
-          Iconify
-        </h1>
-        <p className="text-sm text-muted-foreground text-center mb-6">
-          {totalIcons.toLocaleString()} icons from popular libraries
-        </p>
-        <SearchInput 
-          onSearch={handleSearch}
-          isLoading={isLoading}
-        />
-      </div>
-    </div>
-  </main>
-</div>
-
+      
+      <main className="flex-1 w-full px-4 py-6">
+        <div className="container mx-auto max-w-7xl">
+          {/* Search bar */}
+          <div className="mb-8 max-w-3xl mx-auto">
+            <h1 className="text-3xl font-semibold mb-3 text-center font-display pt-0">
+              Iconify
+            </h1>
+            <p className="text-sm text-muted-foreground text-center mb-6">
+              {totalIcons.toLocaleString()} icons from popular libraries
+            </p>
+            <SearchInput 
+              onSearch={handleSearch}
+              isLoading={isLoading}
+            />
+          </div>
+        </div>
+        
+        {/* Main Content */}
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Main content - Icon Gallery */}
+          <div className={`${selectedIcon ? 'md:w-2/3 lg:w-3/4' : 'w-full'}`}>
+            <IconGallery 
+              searchQuery={debouncedSearchQuery}
+              size={gallerySize}
+              strokeWidth={galleryStrokeWidth}
+              onIconSelect={handleIconSelect}
+              isPreviewOpen={!!selectedIcon}
+            />
+          </div>
           
-          {/* Main Content */}
-          <div className="flex flex-col md:flex-row gap-8">
-            {/* Main content - Icon Gallery */}
-            <div className={`${selectedIcon ? 'md:w-2/3 lg:w-3/4' : 'w-full'}`}>
-              <IconGallery 
-                searchQuery={debouncedSearchQuery}
-                size={gallerySize}
-                strokeWidth={galleryStrokeWidth}
-                onIconSelect={handleIconSelect}
-                isPreviewOpen={!!selectedIcon}
+          {/* Right Sidebar - Only show when an icon is selected */}
+          {selectedIcon && (
+            <div className="md:w-1/3 lg:w-1/4 space-y-5 md:sticky md:top-20 self-start">
+              {/* Preview with Copy/Download buttons */}
+              <IconPreview 
+                selectedIcon={selectedIcon}
+                isLoading={isLoading}
+                size={previewSize}
+                strokeWidth={previewStrokeWidth}
+                color={previewColor}
+                onClose={handleClosePreview}
+              />
+              
+              {/* Size, Stroke, and Color controls - now only affects preview */}
+              <IconControls 
+                size={previewSize}
+                setSize={setPreviewSize}
+                strokeWidth={previewStrokeWidth}
+                setStrokeWidth={setPreviewStrokeWidth}
+                color={previewColor}
+                setColor={setPreviewColor}
+                isLoading={isLoading}
+                hasIcon={!!selectedIcon}
               />
             </div>
-            
-            {/* Right Sidebar - Only show when an icon is selected */}
-            {selectedIcon && (
-              <div className="md:w-1/3 lg:w-1/4 space-y-5 md:sticky md:top-20 self-start">
-                {/* Preview with Copy/Download buttons */}
-                <IconPreview 
-                  selectedIcon={selectedIcon}
-                  isLoading={isLoading}
-                  size={previewSize}
-                  strokeWidth={previewStrokeWidth}
-                  color={previewColor}
-                  onClose={handleClosePreview}
-                />
-                
-                {/* Size, Stroke, and Color controls - now only affects preview */}
-                <IconControls 
-                  size={previewSize}
-                  setSize={setPreviewSize}
-                  strokeWidth={previewStrokeWidth}
-                  setStrokeWidth={setPreviewStrokeWidth}
-                  color={previewColor}
-                  setColor={setPreviewColor}
-                  isLoading={isLoading}
-                  hasIcon={!!selectedIcon}
-                />
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </main>
       
