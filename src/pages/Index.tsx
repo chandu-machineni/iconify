@@ -75,22 +75,25 @@ const Index = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      
-      <main className="flex-1 w-full px-4 py-6">
-        <div className="container mx-auto max-w-7xl">
-          {/* Search bar */}
-          <div className="mb-8 max-w-3xl mx-auto">
-            <h1 className="text-3xl font-semibold mb-3 text-center font-display">
-              Iconify
-            </h1>
-            <p className="text-sm text-muted-foreground text-center mb-6">
-              {totalIcons.toLocaleString()} icons from popular libraries
-            </p>
-            <SearchInput 
-              onSearch={handleSearch}
-              isLoading={isLoading}
-            />
-          </div>
+    <div className="min-h-screen flex flex-col bg-background">
+  {/* Removed the Header component */}
+  
+  <main className="flex-1 w-full px-4 py-6">
+    <div className="container mx-auto max-w-7xl">
+      {/* Search bar */}
+      <div className="mb-8 max-w-3xl mx-auto">
+        {/* Removed the "Iconify" title */}
+        <h1 className="text-3xl font-semibold mb-3 text-center font-display">
+          {/* This is where you can add other content or leave it empty */}
+        </h1>
+        <p className="text-sm text-muted-foreground text-center mb-6">
+          {totalIcons.toLocaleString()} icons from popular libraries
+        </p>
+        <SearchInput 
+          onSearch={handleSearch}
+          isLoading={isLoading}
+        />
+      </div>
           
           {/* Main Content */}
           <div className="flex flex-col md:flex-row gap-8">
