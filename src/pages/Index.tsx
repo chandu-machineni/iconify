@@ -76,8 +76,8 @@ const Index = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
-      <main className="flex-1 w-full px-4 py-6">
-        <div className="container mx-auto max-w-7xl">
+      <main className="flex-1 w-full px-10 pt-0 pb-6">
+        <div className="container mx-auto max-w-screen-lg">
           {/* Search bar */}
           <div className="mb-8 max-w-3xl mx-auto">
             {/* Removed the "Iconify" heading */}
