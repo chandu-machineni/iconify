@@ -14,7 +14,7 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
           <div className="p-1.5 bg-primary rounded-lg">
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-medium">Iconify</span>
+          <span className="text-2xl font-medium">Iconify</span>
         </div>
       </div>
     </header>
