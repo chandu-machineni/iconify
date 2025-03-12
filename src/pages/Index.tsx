@@ -81,7 +81,7 @@ const Index = () => {
           {/* Search bar */}
           <div className="mb-8 max-w-3xl mx-auto">
             {/* Removed the "Iconify" heading */}
-            <p className="text-sm text-muted-foreground text-center mb-6">
+            <p className="text-sm text-muted-foreground text-center mb-6 mt-0">
               {totalIcons.toLocaleString()} icons from popular libraries
             </p>
             <SearchInput 
