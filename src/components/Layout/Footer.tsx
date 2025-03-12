@@ -11,7 +11,8 @@ const Footer: React.FC<FooterProps> = ({ className }) => {
     <footer className={cn("w-full py-6 px-4 sm:px-6 lg:px-8 border-t border-border", className)}>
       <div className="container mx-auto flex items-center justify-center">
         <div className="text-sm text-muted-foreground flex items-center gap-1">
-          Built with <span className="text-red-500">❤️</span> by Chandu Machineni · 
+<span className="text-red-500">🤹</span> Juggling ideas, making things happen – Chandu Machineni · 
+
           <a
             href="https://www.linkedin.com/in/chandumanchala"
             target="_blank"
