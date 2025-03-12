@@ -8,7 +8,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ className }) => {
   return (
-    <header className={cn("w-full pt-10 pb-6 px-4 sm:px-6 lg:px-8", className)}>
+    <header className={cn("w-full pt-10 pb-4 px-4 sm:px-6 lg:px-8", className)}>
       <div className="container mx-auto flex items-center justify-center">
         <div className="flex items-center space-x-2">
           <div className="p-1.5 bg-primary rounded-lg">
