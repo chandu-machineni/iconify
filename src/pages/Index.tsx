@@ -80,9 +80,7 @@ const Index = () => {
         <div className="container mx-auto max-w-7xl">
           {/* Search bar */}
           <div className="mb-8 max-w-3xl mx-auto">
-            <h1 className="text-3xl font-semibold mb-3 text-center font-display pt-0">
-              Iconify
-            </h1>
+            {/* Removed the "Iconify" heading */}
             <p className="text-sm text-muted-foreground text-center mb-6">
               {totalIcons.toLocaleString()} icons from popular libraries
             </p>
