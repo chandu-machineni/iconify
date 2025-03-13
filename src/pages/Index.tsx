@@ -106,7 +106,7 @@ const Index = () => {
           
           {/* Right Sidebar - Only show when an icon is selected */}
           {selectedIcon && (
-            <div className="md:w-1/3 lg:w-1/4 space-y-5 md:sticky md:top-20 self-start">
+            <div className="md:w-1/3 lg:w-1/4 space-y-2 md:sticky md:top-20 self-start">
               {/* Preview with Copy/Download buttons */}
               <IconPreview 
                 selectedIcon={selectedIcon}
