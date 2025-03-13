@@ -8,7 +8,7 @@ import json
 from .mock_icon_generator import generate_icon_from_prompt, convert_to_svg
 from pydantic import BaseModel
 
-app = FastAPI(title="Iconify AI API")
+app = FastAPI(title="Icons AI API")
 
 # Configure CORS
 app.add_middleware(
