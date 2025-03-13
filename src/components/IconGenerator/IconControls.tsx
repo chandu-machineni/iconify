@@ -186,8 +186,7 @@ const IconControls: React.FC<ControlsProps> = ({
           )}
           
           <div className="text-xs text-muted-foreground text-center pt-1">
-            These settings apply only
-to the selected icon preview.
+            These settings apply only to <br /> the selected icon preview.
           </div>
         </div>
       </CardContent>
