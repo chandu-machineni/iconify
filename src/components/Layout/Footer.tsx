@@ -8,10 +8,10 @@ interface FooterProps {
 
 const Footer: React.FC<FooterProps> = ({ className }) => {
   return (
-    <footer className={cn("w-full py-6 px-4 sm:px-6 lg:px-8 border-t border-border", className)}>
+    <footer className={cn("w-full py-4 px-4 sm:px-6 lg:px-8 border-t border-border", className)}>
       <div className="container mx-auto flex items-center justify-center">
         <div className="text-sm text-muted-foreground flex items-center gap-1">
- 🤹 Juggling ideas, making things happen – Chandu Machineni · 
+          🤹 Juggling ideas, making things happen – Chandu Machineni · 
 
           <a
             href="https://www.linkedin.com/in/chandumanchala"
