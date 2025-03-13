@@ -1,6 +1,6 @@
-# Iconify AI Backend
+# Icons AI Backend
 
-The FastAPI backend for the AI-Powered SVG Icon Generator. This server handles the AI processing for generating SVG icons from text prompts.
+This is the backend service for the Icons application, providing AI-powered icon search and recommendations.
 
 ## Features
 
