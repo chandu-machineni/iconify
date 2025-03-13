@@ -92,7 +92,7 @@ const Index = () => {
         </div>
         
         {/* Main Content */}
-        <div className="flex flex-col md:flex-row gap-8">
+        <div className="flex flex-col md:flex-row gap-2">
           {/* Main content - Icon Gallery */}
           <div className={`${selectedIcon ? 'md:w-2/3 lg:w-3/4' : 'w-full'}`}>
             <IconGallery 
