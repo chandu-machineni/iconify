@@ -20,7 +20,7 @@ const Index = () => {
   const galleryStrokeWidth = 0.25;
   
   // Preview icon can be customized
-  const [previewSize, setPreviewSize] = useState(24);
+  const [previewSize, setPreviewSize] = useState(40);
   const [previewStrokeWidth, setPreviewStrokeWidth] = useState(0.25);
   const [previewColor, setPreviewColor] = useState('currentColor');
   
@@ -43,7 +43,6 @@ const Index = () => {
 
   // Handle search
   const handleSearch = (query: string) => {
-    setIsLoading(true);
     setSearchQuery(query);
     
     // Reset selected icon when search changes
@@ -52,19 +51,25 @@ const Index = () => {
     }
     
     // The actual search is handled by the IconGallery component
+    setIsLoading(true);
+    // Use a shorter timeout to prevent focus loss
     setTimeout(() => {
       setIsLoading(false);
-    }, 300);
+    }, 50);
   };
 
   // Handle icon selection
   const handleIconSelect = (icon: Icon) => {
     setSelectedIcon(icon);
     // Reset preview size and stroke width when selecting a new icon
-    setPreviewSize(24);
+    setPreviewSize(40);
     setPreviewStrokeWidth(0.25);
     setPreviewColor('currentColor');
-    toast.success(`Selected "${icon.name}" icon`);
+  };
+  
+  // Handle stroke width changes when not supported
+  const handleStrokeWidthChange = (newStrokeWidth: number) => {
+    setPreviewStrokeWidth(newStrokeWidth);
   };
   
   // Handle closing the preview
@@ -76,11 +81,24 @@ const Index = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
-      <main className="flex-1 w-full px-40 pt-0 pb-6">
-        <div className="container mx-auto max-w-[800px]">
+      {/* Mobile breakpoint message */}
+      <div className="lg:hidden fixed inset-0 z-50 flex flex-col items-center justify-between bg-background">
+        <Header />
+        <div className="flex flex-col items-center justify-center flex-1 p-6 text-center">
+          <h1 className="text-2xl font-semibold mb-4">
+            Switch to Desktop for Full Experience
+          </h1>
+          <p className="text-muted-foreground max-w-md">
+            Our icon customization tools work best on larger screens. Visit us on your desktop to access our complete suite of icon customization features.
+          </p>
+        </div>
+        <Footer />
+      </div>
+      
+      <main className="flex-1 w-full px-40 pt-0 pb-6 hidden lg:block">
+        <div className="container mx-auto max-w-[1024px]">
           {/* Search bar */}
           <div className="mb-8 max-w-3xl mx-auto">
-            {/* Removed the "Iconify" heading */}
             <p className="text-sm text-muted-foreground text-center mb-6 mt-0">
               {totalIcons.toLocaleString()} icons from popular libraries
             </p>
@@ -92,21 +110,22 @@ const Index = () => {
         </div>
         
         {/* Main Content */}
-        <div className="flex flex-col md:flex-row gap-2">
+        <div className="flex flex-col lg:flex-row gap-2">
           {/* Main content - Icon Gallery */}
-          <div className={`${selectedIcon ? 'md:w-2/3 lg:w-3/4' : 'w-full'}`}>
+          <div className={`${selectedIcon ? 'lg:w-2/3 xl:w-3/4' : 'w-full'}`}>
             <IconGallery 
               searchQuery={debouncedSearchQuery}
               size={gallerySize}
               strokeWidth={galleryStrokeWidth}
               onIconSelect={handleIconSelect}
               isPreviewOpen={!!selectedIcon}
+              selectedIconId={selectedIcon?.id}
             />
           </div>
           
           {/* Right Sidebar - Only show when an icon is selected */}
           {selectedIcon && (
-            <div className="md:w-1/3 lg:w-1/4 space-y-2 md:sticky md:top-20 self-start">
+            <div className="lg:w-1/3 xl:w-1/4 space-y-2 lg:sticky top-10 self-start">
               {/* Preview with Copy/Download buttons */}
               <IconPreview 
                 selectedIcon={selectedIcon}
@@ -115,6 +134,10 @@ const Index = () => {
                 strokeWidth={previewStrokeWidth}
                 color={previewColor}
                 onClose={handleClosePreview}
+                onStrokeWidthChange={handleStrokeWidthChange}
+                onSizeChange={setPreviewSize}
+                onColorChange={setPreviewColor}
+                isDarkMode={false}
               />
               
               {/* Size, Stroke, and Color controls - now only affects preview */}
@@ -127,6 +150,8 @@ const Index = () => {
                 setColor={setPreviewColor}
                 isLoading={isLoading}
                 hasIcon={!!selectedIcon}
+                supportsStroke={selectedIcon.iconifyName.split(':')[0].match(/(lucide|tabler|mingcute|line-md|carbon|mdi-light|iconoir|ph|solar|ri|uil|bx)/i) !== null}
+                supportsColor={!selectedIcon.iconifyName.split(':')[0].match(/(twemoji|noto|emojione|fxemoji|openmoji|fluent-emoji|logos|flag|cryptocurrency|circle-flags)/i)}
               />
             </div>
           )}
