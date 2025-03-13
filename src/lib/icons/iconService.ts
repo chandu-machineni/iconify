@@ -610,21 +610,77 @@ interface SvgOptions {
   color?: string;
 }
 
+// Function to test if an SVG string is valid
+function isValidSvg(svg: string): boolean {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svg, 'image/svg+xml');
+    return !doc.querySelector('parsererror');
+  } catch (e) {
+    return false;
+  }
+}
+
+// Function to sanitize SVG content
+function sanitizeSvg(svg: string): string {
+  // Fix common issues that can cause malformed XML
+  
+  // Ensure proper XML declaration if missing
+  if (!svg.includes('<?xml')) {
+    svg = '<?xml version="1.0" encoding="UTF-8"?>\n' + svg;
+  }
+  
+  // Ensure SVG namespace is present
+  if (!svg.includes('xmlns=')) {
+    svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+  
+  // Ensure proper spacing around attributes
+  svg = svg.replace(/([a-z-]+)=([^ >]+)/gi, '$1="$2"');
+  
+  // Fix self-closing tags
+  svg = svg.replace(/<([a-z]+)([^>]*)\s*\/>/gi, '<$1$2></$1>');
+  
+  // Ensure all attributes have quotes
+  svg = svg.replace(/=([^"][^ >]*)/g, '="$1"');
+  
+  // Remove any invalid characters in attribute values
+  svg = svg.replace(/="([^"]*)"/g, (match, value) => {
+    // Replace any control characters with spaces
+    const sanitized = value.replace(/[\x00-\x1F\x7F]/g, ' ');
+    return `="${sanitized}"`;
+  });
+  
+  // Fix duplicate attributes by keeping only the last one
+  svg = svg.replace(/<([a-z]+)([^>]*)>/gi, (match, tag, attrs) => {
+    const seenAttrs = new Set();
+    const parts = attrs.match(/\s+[a-z-]+(?:=(?:"[^"]*"|'[^']*'|[^ >]*))?/gi) || [];
+    
+    // Process attributes in reverse to keep the last occurrence
+    const uniqueAttrs = parts.reverse().filter(attr => {
+      const name = attr.trim().split('=')[0].trim();
+      if (seenAttrs.has(name)) return false;
+      seenAttrs.add(name);
+      return true;
+    }).reverse().join('');
+    
+    return `<${tag}${uniqueAttrs}>`;
+  });
+  
+  return svg;
+}
+
 // Function to modify SVG with custom options
 export async function getSvgWithOptions(iconPath: string, options: SvgOptions): Promise<string> {
   try {
     const { size, strokeWidth, color } = options;
+    const supportsStrokeChanges = supportsStroke(iconPath);
+    const supportsColorChanges = !isColoredIcon(iconPath);
+    
+    // Build the URL with parameters - include size only in the initial request
     let url = `https://api.iconify.design/${iconPath}.svg?width=${size}&height=${size}`;
     
-    if (strokeWidth) {
-      url += `&stroke-width=${strokeWidth}`;
-    }
-    
-    if (color && color !== 'currentColor') {
-      const colorValue = color.startsWith('#') ? color.substring(1) : color;
-      url += `&color=${colorValue}`;
-    }
-    
+    // Fetch the SVG from Iconify API
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch SVG (Status: ${response.status})`);
@@ -632,26 +688,311 @@ export async function getSvgWithOptions(iconPath: string, options: SvgOptions): 
     
     let svg = await response.text();
     
-    // Additional SVG modifications if needed
-    if (strokeWidth) {
-      // Ensure stroke-width is applied to all elements that have a stroke
-      svg = svg.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth}"`);
-      svg = svg.replace(/<path([^>]*)>/g, (match, attrs) => {
-        if (attrs.includes('stroke=') && !attrs.includes('stroke-width=')) {
-          return `<path${attrs} stroke-width="${strokeWidth}">`;
-        }
-        return match;
-      });
-    }
+    // Sanitize the SVG before processing
+    svg = sanitizeSvg(svg);
     
-    if (color && color !== 'currentColor') {
-      // Apply color to strokes and fills
-      const colorValue = color.startsWith('#') ? color : `#${color}`;
-      svg = svg.replace(/stroke="[^"]*"/g, `stroke="${colorValue}"`);
-      svg = svg.replace(/fill="[^"]*"/g, `fill="${colorValue}"`);
+    // Create a DOM parser to properly handle SVG modifications
+    const parser = new DOMParser();
+    const serializer = new XMLSerializer();
+    
+    try {
+      // Parse the SVG string into a DOM document
+      const doc = parser.parseFromString(svg, 'image/svg+xml');
+      
+      // Check for parsing errors
+      const parserError = doc.querySelector('parsererror');
+      if (parserError) {
+        console.error('SVG parsing error:', parserError.textContent);
+        throw new Error('Failed to parse SVG');
+      }
+      
+      const svgElement = doc.documentElement;
+      
+      // Apply stroke width if supported and provided
+      if (strokeWidth !== undefined && supportsStrokeChanges) {
+        // Set stroke-width on the SVG root for inheritance
+        svgElement.setAttribute('stroke-width', strokeWidth.toString());
+        svgElement.setAttribute('stroke-linecap', 'round');
+        svgElement.setAttribute('stroke-linejoin', 'round');
+        
+        // Apply stroke-width to all path, line, rect, etc. elements
+        const strokeElements = doc.querySelectorAll('path, line, rect, circle, ellipse, polyline, polygon');
+        strokeElements.forEach(el => {
+          // Only set stroke-width if the element doesn't have stroke="none"
+          if (el.getAttribute('stroke') !== 'none') {
+            el.setAttribute('stroke-width', strokeWidth.toString());
+            
+            // Ensure stroke attribute is set if missing
+            if (!el.hasAttribute('stroke')) {
+              el.setAttribute('stroke', 'currentColor');
+            }
+          }
+        });
+        
+        // Handle any groups that might contain paths
+        const groups = doc.querySelectorAll('g');
+        groups.forEach(group => {
+          if (group.getAttribute('stroke') !== 'none') {
+            group.setAttribute('stroke-width', strokeWidth.toString());
+            
+            // Ensure stroke attribute is set if missing
+            if (!group.hasAttribute('stroke')) {
+              group.setAttribute('stroke', 'currentColor');
+            }
+          }
+        });
+      }
+      
+      // Apply color if supported and provided
+      if (color && color !== 'currentColor' && supportsColorChanges) {
+        // Apply color to all elements with stroke or fill
+        const colorElements = doc.querySelectorAll('[stroke], [fill]');
+        colorElements.forEach(el => {
+          // Apply to stroke if it's not "none"
+          if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
+            el.setAttribute('stroke', color);
+          }
+          
+          // Apply to fill if it's not "none"
+          if (el.hasAttribute('fill') && el.getAttribute('fill') !== 'none') {
+            el.setAttribute('fill', color);
+          }
+        });
+        
+        // Apply to groups that might contain paths
+        const groups = doc.querySelectorAll('g');
+        groups.forEach(group => {
+          if (group.getAttribute('stroke') !== 'none' && group.hasAttribute('stroke')) {
+            group.setAttribute('stroke', color);
+          }
+          if (group.getAttribute('fill') !== 'none' && group.hasAttribute('fill')) {
+            group.setAttribute('fill', color);
+          }
+        });
+        
+        // Apply to elements without explicit stroke/fill attributes
+        const allElements = doc.querySelectorAll('path, line, rect, circle, ellipse, polyline, polygon');
+        allElements.forEach(el => {
+          // If element has no stroke or fill attribute, add them
+          if (!el.hasAttribute('stroke') && !el.hasAttribute('fill')) {
+            el.setAttribute('stroke', color);
+            el.setAttribute('fill', color);
+          }
+        });
+        
+        // If no elements have stroke/fill, apply to SVG root
+        if (colorElements.length === 0) {
+          svgElement.setAttribute('stroke', color);
+          svgElement.setAttribute('fill', color);
+        }
+      }
+      
+      // Apply inline styles to ensure compatibility with all viewers
+      const allElements = doc.querySelectorAll('*');
+      allElements.forEach(el => {
+        // Get computed styles and apply them inline
+        if (el.hasAttribute('stroke-width') || el.hasAttribute('stroke') || el.hasAttribute('fill')) {
+          let style = el.getAttribute('style') || '';
+          
+          if (el.hasAttribute('stroke-width')) {
+            const strokeWidth = el.getAttribute('stroke-width');
+            if (!style.includes('stroke-width:')) {
+              style += `; stroke-width: ${strokeWidth}px;`;
+            }
+          }
+          
+          if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
+            const stroke = el.getAttribute('stroke');
+            if (!style.includes('stroke:')) {
+              style += `; stroke: ${stroke};`;
+            }
+          }
+          
+          if (el.hasAttribute('fill') && el.getAttribute('fill') !== 'none') {
+            const fill = el.getAttribute('fill');
+            if (!style.includes('fill:')) {
+              style += `; fill: ${fill};`;
+            }
+          }
+          
+          // Clean up style string and set it
+          style = style.replace(/^;/, '').trim();
+          if (style) {
+            el.setAttribute('style', style);
+          }
+        }
+      });
+      
+      // Serialize back to string
+      svg = serializer.serializeToString(doc);
+      
+      // Fix self-closing tags for better compatibility
+      svg = svg.replace(/<([a-z]+)([^>]*)\/>/gi, '<$1$2></$1>');
+      
+      // Validate the final SVG structure
+      const validationDoc = parser.parseFromString(svg, 'image/svg+xml');
+      if (validationDoc.querySelector('parsererror')) {
+        console.error('SVG validation error after modifications');
+        throw new Error('Generated invalid SVG');
+      }
+      
+      // Final validation before returning
+      if (!isValidSvg(svg)) {
+        console.error('Final SVG validation failed, attempting emergency repair');
+        
+        // Try a different approach - use the Iconify API with parameters directly
+        let parameterizedUrl = `https://api.iconify.design/${iconPath}.svg?width=${size}&height=${size}`;
+        
+        // Add stroke-width parameter if provided and supported
+        if (strokeWidth !== undefined && supportsStrokeChanges) {
+          parameterizedUrl += `&stroke-width=${strokeWidth}`;
+        }
+        
+        // Add color parameter if provided and supported
+        if (color && color !== 'currentColor' && supportsColorChanges) {
+      const colorValue = color.startsWith('#') ? color.substring(1) : color;
+          parameterizedUrl += `&color=${colorValue}`;
+        }
+        
+        const directSvg = await fetch(parameterizedUrl).then(r => r.text());
+        
+        if (isValidSvg(directSvg)) {
+          console.log('Using direct API parameters as fallback');
+          return directSvg;
+        }
+        
+        // If that fails too, return original unmodified SVG
+        const originalSvg = await fetch(`https://api.iconify.design/${iconPath}.svg?width=${size}&height=${size}`).then(r => r.text());
+        
+        if (isValidSvg(originalSvg)) {
+          console.log('Returning original unmodified SVG as fallback');
+          return originalSvg;
+        } else {
+          throw new Error('Cannot generate valid SVG');
+        }
+      }
+      
+      return svg;
+    } catch (domError) {
+      console.error('Error manipulating SVG DOM:', domError);
+      
+      // Fallback to regex-based approach if DOM manipulation fails
+      console.log('Falling back to regex-based SVG modification');
+      
+      // Apply stroke width if supported and provided
+      if (strokeWidth !== undefined && supportsStrokeChanges) {
+        // Add stroke-width to SVG root
+        svg = svg.replace(/<svg([^>]*)>/, `<svg$1 stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round">`);
+        
+        // Carefully add stroke-width to elements with proper attribute placement
+        svg = svg.replace(/<(path|line|rect|circle|ellipse|polyline|polygon|g)([^>]*)>/g, (match, tag, attrs) => {
+          // Don't add stroke-width if stroke="none" is present
+          if (attrs.includes('stroke="none"')) {
+        return match;
+          }
+          
+          // Add stroke="currentColor" if no stroke attribute exists
+          if (!attrs.includes('stroke=')) {
+            attrs += ' stroke="currentColor"';
+          }
+          
+          // Add stroke-width if it doesn't exist
+          if (!attrs.includes('stroke-width=')) {
+            attrs += ` stroke-width="${strokeWidth}"`;
+          } else {
+            // Replace existing stroke-width
+            attrs = attrs.replace(/stroke-width="[^"]*"/, `stroke-width="${strokeWidth}"`);
+          }
+          
+          return `<${tag}${attrs}>`;
+        });
+      }
+      
+      // Apply color if supported and provided
+      if (color && color !== 'currentColor' && supportsColorChanges) {
+        // Apply color to strokes (but not to stroke="none")
+        svg = svg.replace(/stroke="([^"]*)"(?![^<>]*stroke="none")/g, (match, strokeValue) => {
+          if (strokeValue === 'none') return match;
+          return `stroke="${color}"`;
+        });
+        
+        // Apply color to fills (but not to fill="none")
+        svg = svg.replace(/fill="([^"]*)"(?![^<>]*fill="none")/g, (match, fillValue) => {
+          if (fillValue === 'none') return match;
+          return `fill="${color}"`;
+        });
+        
+        // Apply to style attributes
+        svg = svg.replace(/style="([^"]*)"/g, (match, style) => {
+          let newStyle = style;
+          
+          // Apply to stroke in style
+          if (style.includes('stroke:') && !style.includes('stroke:none')) {
+            newStyle = newStyle.replace(/stroke:[^;]*(;|$)/, `stroke:${color}$1`);
+          } else if (!style.includes('stroke:')) {
+            newStyle += `; stroke: ${color};`;
+          }
+          
+          // Apply to fill in style
+          if (style.includes('fill:') && !style.includes('fill:none')) {
+            newStyle = newStyle.replace(/fill:[^;]*(;|$)/, `fill:${color}$1`);
+          } else if (!style.includes('fill:')) {
+            newStyle += `; fill: ${color};`;
+          }
+          
+          // Clean up style string
+          newStyle = newStyle.replace(/^;/, '').trim();
+          
+          return `style="${newStyle}"`;
+        });
+        
+        // Add color attributes to elements without them
+        svg = svg.replace(/<(path|line|rect|circle|ellipse|polyline|polygon)([^>]*)>/g, (match, tag, attrs) => {
+          if (!attrs.includes('stroke=') && !attrs.includes('fill=')) {
+            attrs += ` stroke="${color}" fill="${color}"`;
+          }
+          return `<${tag}${attrs}>`;
+        });
+      }
+      
+      // Final validation before returning
+      if (!isValidSvg(svg)) {
+        console.error('Final SVG validation failed, attempting emergency repair');
+        
+        // Try a different approach - use the Iconify API with parameters directly
+        let parameterizedUrl = `https://api.iconify.design/${iconPath}.svg?width=${size}&height=${size}`;
+        
+        // Add stroke-width parameter if provided and supported
+        if (strokeWidth !== undefined && supportsStrokeChanges) {
+          parameterizedUrl += `&stroke-width=${strokeWidth}`;
+        }
+        
+        // Add color parameter if provided and supported
+        if (color && color !== 'currentColor' && supportsColorChanges) {
+          const colorValue = color.startsWith('#') ? color.substring(1) : color;
+          parameterizedUrl += `&color=${colorValue}`;
+        }
+        
+        const directSvg = await fetch(parameterizedUrl).then(r => r.text());
+        
+        if (isValidSvg(directSvg)) {
+          console.log('Using direct API parameters as fallback');
+          return directSvg;
+        }
+        
+        // If that fails too, return original unmodified SVG
+        const originalSvg = await fetch(`https://api.iconify.design/${iconPath}.svg?width=${size}&height=${size}`).then(r => r.text());
+        
+        if (isValidSvg(originalSvg)) {
+          console.log('Returning original unmodified SVG as fallback');
+          return originalSvg;
+        } else {
+          throw new Error('Cannot generate valid SVG');
+        }
     }
     
     return svg;
+    }
   } catch (error) {
     console.error('Error modifying SVG:', error);
     throw error;
@@ -701,9 +1042,25 @@ export function isColoredIcon(iconPath: string): boolean {
 
 // Function to get formatted filename
 export function getFormattedFilename(icon: Icon, options: SvgOptions): string {
-  const { size, strokeWidth } = options;
+  const { size, strokeWidth, color } = options;
   const baseName = icon.name.toLowerCase().replace(/\s+/g, '-');
-  return `${baseName}-${size}px${strokeWidth ? `-${strokeWidth}px` : ''}.svg`;
+  let filename = `${baseName}-${size}px`;
+  
+  // Include stroke width in filename if provided and icon supports stroke
+  if (strokeWidth !== undefined && supportsStroke(icon.iconifyName)) {
+    filename += `-stroke${strokeWidth}`;
+  }
+  
+  // Include color in filename if provided and not default
+  if (color && color !== 'currentColor' && !isColoredIcon(icon.iconifyName)) {
+    // Remove # from hex color and truncate long color values
+    const colorValue = color.startsWith('#') ? color.substring(1) : color;
+    // Truncate very long color values
+    const shortColorValue = colorValue.length > 10 ? colorValue.substring(0, 10) : colorValue;
+    filename += `-${shortColorValue}`;
+  }
+  
+  return `${filename}.svg`;
 }
 
 // Function to show appropriate toast messages
