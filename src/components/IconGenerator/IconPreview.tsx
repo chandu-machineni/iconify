@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Icon, getSvgWithOptions, supportsStroke, isColoredIcon, getFormattedFilename, showIconTypeWarning } from '@/lib/icons/iconService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +14,10 @@ interface IconPreviewProps {
   strokeWidth: number;
   color?: string; 
   onClose?: () => void;
+  onStrokeWidthChange: (newStrokeWidth: number) => void;
+  onSizeChange: (newSize: number) => void;
+  onColorChange: (newColor: string) => void;
+  isDarkMode: boolean;
 }
 
 const IconPreview: React.FC<IconPreviewProps> = ({
@@ -22,11 +26,18 @@ const IconPreview: React.FC<IconPreviewProps> = ({
   size,
   strokeWidth,
   color = 'currentColor',
-  onClose
+  onClose,
+  onStrokeWidthChange,
+  onSizeChange,
+  onColorChange,
+  isDarkMode
 }) => {
   const [copying, setCopying] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [copyingSnippet, setCopyingSnippet] = useState(false);
+  const [renderedSvg, setRenderedSvg] = useState<string | null>(null);
+  const iconContainerRef = useRef<HTMLDivElement>(null);
+  const iconRef = useRef<HTMLSpanElement>(null);
 
   if (!selectedIcon && !isLoading) {
     return null;
@@ -62,27 +73,132 @@ const IconPreview: React.FC<IconPreviewProps> = ({
   const canEditStroke = supportsStroke(iconPath);
   const canEditColor = !isColoredIcon(iconPath);
 
+  // Function to capture the rendered SVG directly from the DOM
+  const captureRenderedSvg = () => {
+    if (!iconRef.current) return null;
+    
+    // Find the SVG element inside the container
+    const svgElement = iconRef.current.querySelector('svg');
+    if (!svgElement) return null;
+    
+    // Clone the SVG to avoid modifying the displayed one
+    const clonedSvg = svgElement.cloneNode(true) as SVGElement;
+    
+    // Ensure width and height attributes are set
+    clonedSvg.setAttribute('width', size.toString());
+    clonedSvg.setAttribute('height', size.toString());
+    
+    // Ensure xmlns attribute is set for standalone SVG
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    
+    // Add metadata for Figma frame naming
+    if (selectedIcon) {
+      // Add title element for accessibility and Figma frame naming
+      const titleElement = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      titleElement.textContent = selectedIcon.name;
+      clonedSvg.insertBefore(titleElement, clonedSvg.firstChild);
+      
+      // Add id attribute for Figma frame naming
+      clonedSvg.setAttribute('id', selectedIcon.name.toLowerCase().replace(/\s+/g, '-'));
+    }
+    
+    // Apply computed styles to ensure stroke and color are correctly set
+    const applyComputedStyles = (element: Element) => {
+      if (element instanceof SVGElement) {
+        const computedStyle = window.getComputedStyle(element);
+        
+        // Apply stroke attributes if they exist in computed styles
+        if (computedStyle.stroke && computedStyle.stroke !== 'none') {
+          element.setAttribute('stroke', color);
+          element.setAttribute('stroke-width', strokeWidth.toString());
+        }
+        
+        // Apply fill if it exists in computed styles
+        if (computedStyle.fill && computedStyle.fill !== 'none') {
+          element.setAttribute('fill', color);
+        }
+      }
+      
+      // Recursively apply to all child elements
+      Array.from(element.children).forEach(applyComputedStyles);
+    };
+    
+    // Apply styles to all elements
+    applyComputedStyles(clonedSvg);
+    
+    // Serialize the SVG to a string
+    const serializer = new XMLSerializer();
+    return serializer.serializeToString(clonedSvg);
+  };
+
+  // Update the rendered SVG whenever relevant properties change
+  useEffect(() => {
+    if (selectedIcon && !isLoading) {
+      // Wait a bit for the icon to render completely
+      const timer = setTimeout(() => {
+        const svg = captureRenderedSvg();
+        if (svg) {
+          setRenderedSvg(svg);
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [selectedIcon, size, strokeWidth, color, isLoading]);
+
   // Handle copy SVG to clipboard
   const handleCopy = async () => {
     if (!selectedIcon) return;
     
     try {
       setCopying(true);
-      const svg = await getSvgWithOptions(iconPath, {
-        size,
-        strokeWidth: canEditStroke ? strokeWidth : undefined,
-        color: canEditColor ? color : undefined
+      console.log(`Copying icon with strokeWidth: ${strokeWidth}, color: ${color}`);
+      
+      // Use the captured SVG instead of fetching a new one
+      const svgString = renderedSvg || captureRenderedSvg();
+      
+      if (!svgString) {
+        console.error('Failed to capture SVG for copying');
+        toast.error("Failed to capture SVG from preview");
+        return;
+      }
+      
+      // Try to use the clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(svgString);
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = svgString;
+        textArea.style.position = 'fixed';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+          document.execCommand('copy');
+        } catch (err) {
+          console.error('Failed to copy SVG: ', err);
+          throw err;
+        }
+        
+        document.body.removeChild(textArea);
+      }
+      
+      toast.success('SVG copied to clipboard!', {
+        icon: '✓',
+        style: {
+          borderRadius: '10px',
+          background: '#333',
+          color: '#fff',
+        },
       });
       
-      await navigator.clipboard.writeText(svg);
-      
-      toast.success("SVG copied to clipboard", {
-        description: "This is a vector file that can be edited in Figma, Illustrator, or other vector editors."
-      });
-      
-      setTimeout(() => setCopying(false), 2000);
+      setTimeout(() => {
+        setCopying(false);
+      }, 2000);
     } catch (error) {
-      console.error("Error copying SVG:", error);
+      console.error('Failed to copy SVG: ', error);
       toast.error(`Failed to copy SVG: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setCopying(false);
     }
@@ -94,34 +210,39 @@ const IconPreview: React.FC<IconPreviewProps> = ({
     
     try {
       setDownloading(true);
-      const svg = await getSvgWithOptions(iconPath, {
+      console.log(`Downloading icon with strokeWidth: ${strokeWidth}, color: ${color}`);
+      
+      // Use the captured SVG instead of fetching a new one
+      const svgString = renderedSvg || captureRenderedSvg();
+      
+      if (!svgString) {
+        console.error('Failed to capture SVG for download');
+        toast.error("Failed to capture SVG from preview");
+        return;
+      }
+      
+      // Create a blob from the SVG string
+      const blob = new Blob([svgString], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create a download link and trigger it
+      const downloadLink = document.createElement('a');
+      downloadLink.href = url;
+      downloadLink.download = getFormattedFilename(selectedIcon, {
         size,
         strokeWidth: canEditStroke ? strokeWidth : undefined,
         color: canEditColor ? color : undefined
       });
-      
-      const blob = new Blob([svg], { type: 'image/svg+xml' });
-      const downloadUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = getFormattedFilename(selectedIcon, {
-        size,
-        strokeWidth: canEditStroke ? strokeWidth : undefined
-      });
-      document.body.appendChild(a);
-      a.click();
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
       
       setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(downloadUrl);
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(url);
         setDownloading(false);
       }, 100);
-      
-      toast.success(`Downloaded "${selectedIcon.name}" as SVG`, {
-        description: "This is a vector file that can be edited in Figma, Illustrator, or other vector editors."
-      });
     } catch (error) {
-      console.error("Error downloading SVG:", error);
+      console.error('Failed to download SVG: ', error);
       toast.error(`Failed to download SVG: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setDownloading(false);
     }
@@ -175,35 +296,55 @@ const IconPreview: React.FC<IconPreviewProps> = ({
   };
   
   return (
-    <Card className="border border-slate-100 shadow-sm overflow-hidden relative">
-      {onClose && (
-        <button 
-          onClick={onClose}
-          className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-slate-100 transition-colors z-10"
-          aria-label="Close preview"
-        >
-          <X className="h-4 w-4 text-slate-500" />
-        </button>
-      )}
-      
-      <CardContent className="p-6">
-        {isLoading ? (
+    <div className="w-full max-w-[408px] mx-auto">
+      <Card className="overflow-hidden border-0 shadow-sm">
+        <CardContent className="p-4">
           <div className="flex flex-col items-center">
-            <Skeleton className="h-16 w-16 rounded-full mb-3" />
-            <Skeleton className="h-3 w-24 rounded mb-1" />
-          </div>
-        ) : selectedIcon && (
-          <>
-            <div className="bg-slate-50 rounded-lg p-10 mb-4 flex items-center justify-center">
-              <DynamicIcon 
-                iconName={selectedIcon.iconifyName}
-                size={size * 1.5} 
-                strokeWidth={canEditStroke ? strokeWidth : undefined}
-                color={canEditColor ? color : undefined}
-                className="text-primary"
-                onClick={showEditabilityWarning}
-              />
-          </div>
+            {/* Close button */}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            
+            <div className="bg-slate-50 rounded-lg p-5 mb-4 flex items-center justify-center relative" ref={iconContainerRef}>
+              <div 
+                className="relative flex items-center justify-center w-full h-full"
+                style={{ 
+                  minHeight: `${size}px`,
+                  minWidth: `${size}px`
+                }}
+              >
+                <div 
+                  className="w-full h-full flex items-center justify-center"
+                  style={{ 
+                    transform: `scale(${size / 24})`,
+                    transformOrigin: 'center',
+                    color: color === 'currentColor' ? 'currentColor' : color,
+                    strokeWidth: strokeWidth * 1.67,
+                    strokeLinejoin: 'round',
+                    strokeLinecap: 'round'
+                  }}
+                >
+                  <DynamicIcon 
+                    iconName={selectedIcon.iconifyName}
+                    size={24}
+                    strokeWidth={canEditStroke ? strokeWidth : undefined}
+                    color={canEditColor ? color : undefined}
+                    className="text-primary"
+                    onClick={showEditabilityWarning}
+                    isPreview={true}
+                    onStrokeWidthChange={onStrokeWidthChange}
+                    containerClassName="relative"
+                    showFeatureIndicatorsInContainer={false}
+                    ref={iconRef}
+                  />
+                </div>
+              </div>
+            </div>
             
             <div className="text-center mb-6">
               <h3 className="text-base font-medium mb-1">{selectedIcon.name}</h3>
@@ -212,56 +353,43 @@ const IconPreview: React.FC<IconPreviewProps> = ({
                 {canEditColor ? (
                   <>
                     {` • ${size}px`}
-                    {canEditStroke && ` • ${strokeWidth.toFixed(2)}px stroke`}
-                    {color !== 'currentColor' && ` • ${color}`}
+                    {canEditStroke && ` • ${(strokeWidth * 1.67).toFixed(1)}px`}
+                    {color !== 'currentColor' && (
+                      <span className="inline-flex items-center">
+                        {' • '}
+                        <span 
+                          className="inline-block w-3 h-3 rounded-full ml-0.5" 
+                          style={{ backgroundColor: color }}
+                        />
+                      </span>
+                    )}
                   </>
                 ) : (
                   ` • ${size}px • Non-editable`
                 )}
-          </p>
-        </div>
+              </p>
+            </div>
             
             <div className="space-y-3">
-              {/* Copy buttons row */}
-              <div className="grid grid-cols-2 gap-2">
-                <Button 
-                  onClick={handleCopy} 
-                  variant="default"
-                  className="h-9 justify-center"
-                  disabled={copying}
-                >
-                  {copying ? (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      <span>Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4 mr-2" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </Button>
-                
-                <Button 
-                  variant="default" 
-                  onClick={handleCopySnippet} 
-                  className="h-9 justify-center"
-                  disabled={copyingSnippet}
-                >
-                  {copyingSnippet ? (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      <span>Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Code className="h-4 w-4 mr-2" />
-                      <span>Code</span>
-                    </>
-                  )}
-                </Button>
-              </div>
+              {/* Copy button - full width */}
+              <Button 
+                onClick={handleCopy} 
+                variant="default"
+                className="w-full h-9 justify-center"
+                disabled={copying}
+              >
+                {copying ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    <span>Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    <span>Copy as SVG</span>
+                  </>
+                )}
+              </Button>
               
               {/* Download button */}
               <Button 
@@ -273,11 +401,11 @@ const IconPreview: React.FC<IconPreviewProps> = ({
                 <Download className="h-4 w-4 mr-2" />
                 <span>Download as SVG</span>
               </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
   );
 };
 
