@@ -194,7 +194,7 @@ const IconPreview: React.FC<IconPreviewProps> = ({
           </div>
         ) : selectedIcon && (
           <>
-            <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center">
+            <div className="bg-slate-50 rounded-lg p-10 mb-4 flex items-center justify-center">
               <DynamicIcon 
                 iconName={selectedIcon.iconifyName}
                 size={size * 1.5} 
