@@ -205,7 +205,7 @@ const IconPreview: React.FC<IconPreviewProps> = ({
               />
           </div>
             
-            <div className="text-center mb-9">
+            <div className="text-center mb-8">
               <h3 className="text-base font-medium mb-1">{selectedIcon.name}</h3>
               <p className="text-xs text-muted-foreground">
                 {getIconTypeDisplay()}
