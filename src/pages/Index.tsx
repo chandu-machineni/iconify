@@ -77,7 +77,7 @@ const Index = () => {
       <Header />
       
       <main className="flex-1 w-full px-10 pt-0 pb-6">
-        <div className="container mx-auto max-w-[1000px]">
+        <div className="container mx-auto max-w-[800px]">
           {/* Search bar */}
           <div className="mb-8 max-w-3xl mx-auto">
             {/* Removed the "Iconify" heading */}
