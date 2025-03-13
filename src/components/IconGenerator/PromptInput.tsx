@@ -15,6 +15,7 @@ const SearchInput: React.FC<SearchInputProps> = ({
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   
   // Clean up timers on unmount
   useEffect(() => {
@@ -22,6 +23,20 @@ const SearchInput: React.FC<SearchInputProps> = ({
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
+    };
+  }, []);
+  
+  // Handle clicks outside the form
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (formRef.current && !formRef.current.contains(event.target as Node)) {
+        setIsFocused(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
   
@@ -48,14 +63,14 @@ const SearchInput: React.FC<SearchInputProps> = ({
       return;
     }
     
-    // For non-empty queries, debounce but with longer delay
+    // For non-empty queries, debounce but with shorter delay
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
     
     debounceTimerRef.current = setTimeout(() => {
       onSearch(newQuery.trim());
-    }, 800); // Longer delay to prevent too frequent searches
+    }, 150); // Shorter delay for better responsiveness
   };
   
   // Clear search query and reset results
@@ -79,7 +94,7 @@ const SearchInput: React.FC<SearchInputProps> = ({
   
   return (
     <div className="w-full">
-      <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto">
+      <form ref={formRef} onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto">
         <div className={`relative transition-all duration-200 rounded-full ${isFocused ? 'ring-2 ring-primary/70 ring-offset-1' : 'ring-0'}`}>
           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
             <Search className="h-4 w-4" />
@@ -89,10 +104,8 @@ const SearchInput: React.FC<SearchInputProps> = ({
             value={searchQuery}
             onChange={handleInputChange}
             onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
             placeholder="Search icons"
             className="pl-11 pr-10 h-11 rounded-full bg-white shadow-sm border-slate-200 focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-            disabled={isLoading}
           />
           {searchQuery && !isLoading && (
             <button
@@ -105,7 +118,7 @@ const SearchInput: React.FC<SearchInputProps> = ({
             </button>
           )}
           {isLoading && (
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-primary">
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none w-4 h-4 flex items-center justify-center">
               <Loader2 className="h-4 w-4 animate-spin" />
             </div>
           )}
