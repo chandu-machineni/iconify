@@ -104,7 +104,6 @@ const IconGallery: React.FC<IconGalleryProps> = ({
         setHasMore(endIndex < allResults.length);
       } else {
         // If we need to fetch more from the API
-        // If we're searching, fetch more results for that search
         const moreResults = await searchIcons(searchQuery, {}, nextPage);
         
         // Append new results to existing ones
@@ -124,88 +123,6 @@ const IconGallery: React.FC<IconGalleryProps> = ({
     }
   };
 
-  // Copy SVG content to clipboard with visual feedback
-  const handleCopySVG = async (iconName: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering icon selection
-    try {
-      // Get SVG from Iconify API - Fix: removing 'icon/' from the path
-      const iconPath = iconName.replace(':', '/'); // Convert "prefix:name" to "prefix/name"
-      const response = await fetch(`https://api.iconify.design/${iconPath}.svg?width=${size}&height=${size}&stroke-width=${strokeWidth}`);
-      if (!response.ok) throw new Error(`Failed to fetch SVG (${response.status} ${response.statusText})`);
-      
-      const svgText = await response.text();
-      
-      // Clean up SVG if needed (usually not necessary with direct API call)
-      const cleanedSvg = svgText;
-      
-      // Try to use the modern clipboard API
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(cleanedSvg);
-      } else {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = cleanedSvg;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
-      
-      // Show success and set the copy animation
-      setCopiedIcons(prev => ({ ...prev, [iconName]: 'svg' }));
-      toast.success("SVG copied to clipboard");
-      
-      // Reset after 2 seconds
-      setTimeout(() => {
-        setCopiedIcons(prev => {
-          const newState = { ...prev };
-          delete newState[iconName];
-          return newState;
-        });
-      }, 2000);
-    } catch (error) {
-      console.error("Error copying SVG:", error);
-      toast.error(`Failed to copy SVG: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
-  
-  // Copy component code to clipboard with visual feedback
-  const handleCopyCode = (iconName: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering icon selection
-    const code = `<Icon icon="${iconName}" />`;
-    
-    try {
-      // Try to use the modern clipboard API
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(code);
-      } else {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = code;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
-      
-      // Show success and set the copy animation
-      setCopiedIcons(prev => ({ ...prev, [iconName]: 'code' }));
-      toast.success("Code copied to clipboard");
-      
-      // Reset after 2 seconds
-      setTimeout(() => {
-        setCopiedIcons(prev => {
-          const newState = { ...prev };
-          delete newState[iconName];
-          return newState;
-        });
-      }, 2000);
-    } catch (error) {
-      console.error("Error copying code:", error);
-      toast.error("Failed to copy code");
-    }
-  };
-  
   // Determine the grid columns class based on whether preview is open
   const gridColumnsClass = isPreviewOpen
     ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
@@ -299,9 +216,9 @@ const IconGallery: React.FC<IconGalleryProps> = ({
         </div>
       )}
       
-      {/* Results count */}
+      {/* Centered results count (Fixed alignment on line 304) */}
       {!loading && icons.length > 0 && (
-        <div className="text-xs text-muted-foreground">
+        <div className="text-xs text-muted-foreground text-center">
           {hasSearchResults ? (
             <>Showing {icons.length.toLocaleString()} of {allResults.length.toLocaleString()} results for "{searchQuery}"</>
           ) : (
@@ -313,4 +230,4 @@ const IconGallery: React.FC<IconGalleryProps> = ({
   );
 };
 
-export default IconGallery; 
+export default IconGallery;
